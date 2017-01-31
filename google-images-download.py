@@ -19,23 +19,20 @@ Todo:
 
 import time  #Importing the time library to check the time of code execution
 import sys   #Importing the System Library
-
+import hashlib
 import urllib
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
+from pathlib import Path
 
 ########### Edit From Here ###########
 
 #This list is used to search keywords. You can edit this list to search for google images of your choice. 
 #You can simply add and remove elements of the list.
 
-search_keyword = ['anime']
-
-#This list is used to further add suffix to your search term. 
-#Each element of the list will help you download 100 images. 
-#Product of the two params will be searched.
-#You can edit the list by adding/deleting elements from it.
-keywords = [' girl', ' pretty']
+firstRound = ['anime girl', 'pixiv']
+secondRound = ['color drawing', 'orange', 'red', 'light', 'color', 'face', 'green', 'blue', 'coloring', 'dark', 'gray', 'pretty']
+thirdRound = ['eye', 'face', 'body', 'weapon', 'hair', 'uniform', 'summer', 'winter', 'autumn', 'spring', 'kimono', 'swim', 'school']
 USER_AGENT = 'Mozilla/5.0 (X11; Linux i686) AppleWebKit/537.17 (KHTML, like Gecko) Chrome/24.0.1312.27 Safari/537.17'
 ########### End of Editing ###########
 
@@ -62,7 +59,7 @@ def download_page(url):
         try:
             headers = {}
             headers['User-Agent'] = "Mozilla/5.0 (X11; Linux i686) AppleWebKit/537.17 (KHTML, like Gecko) Chrome/24.0.1312.27 Safari/537.17"
-            _req = urllib.Request(url, headers = headers)
+            _req = urllib.Request(url, headers=headers)
             response = urllib.urlopen(_req)
             page = response.read()
             return page
@@ -102,37 +99,37 @@ def _images_get_all_items(page):
 ############## Main Program ############
 T0 = time.time()   #start the timer
 
+intNoC = len(firstRound) * len(secondRound) * len(thirdRound)
+print("Number of keyword combinations: " + str(intNoC))
+
 #Download Image Links
-i = 0
-while i < len(search_keyword):
-    items = []
-    iteration = "Item no.: " + str(i+1) + " -->" + " Item name = " + str(search_keyword[i])
-    print(iteration)
-    print("Evaluating...")
-    SEARCH = search_keyword[i].replace(' ', '%20')
-    j = 0
-    while j < len(keywords):
-        pure_keyword = keywords[j].replace(' ', '%20')
-        URL = 'https://www.google.com/search?q=' + SEARCH + pure_keyword + '&espv=2&biw=1366&bih=667&site=webhp&source=lnms&tbm=isch&sa=X&ei=XosDVaCXD8TasATItgE&ved=0CAcQ_AUoAg'
-        raw_html = (download_page(URL))
-        time.sleep(0.1)
-        items = items + (_images_get_all_items(raw_html))
-        j = j + 1
-    #print ("Image Links = "+str(items))
-    print("Total Image Links = "+str(len(items)))
-    print("\n")
-    i = i+1
+items = []
+for i in firstRound:
+    for j in secondRound:
+        for k in thirdRound:
+            temp = ' '.join([i, j, k])
+            print("Evaluating keyword name = " + temp)
+            search = temp.replace(" ", "%20")
+
+            print("Keyword:" + search)
+            URL = 'https://www.google.com/search?q=' + search + '&espv=2&biw=1366&bih=667&site=webhp&source=lnms&tbm=isch&sa=X&ei=XosDVaCXD8TasATItgE&ved=0CAcQ_AUoAg'
+            RAW_HTML = (download_page(URL))
+            time.sleep(0.1)
+            items.extend(_images_get_all_items(RAW_HTML))
+            #print ("Image Links = "+str(items))
+            print("Total Image Links = "+str(len(items)))
+            print("\n")
 
 
-    #This allows you to write all the links into a test file.
-    #This text file will be created in the same directory as your code.
-    #You can comment out the below 3 lines to stop writing the output to the text file.
-    FH = open('output.txt', 'a')        #Open the text file called database.txt
+            #This allows you to write all the links into a test file.
+            #This text file will be created in the same directory as your code.
+            #You can comment out the below 3 lines to stop writing the output to the text file.
+            FH = open('output.txt', 'a')        #Open the text file called database.txt
 
-    FH.write(str(i) + ': ' + str(search_keyword[i-1]) + ": " + str(items) + "\n\n\n")
-    #Write the title of the page
+            FH.write(search + ": " + str(items) + "\n\n\n")
+            #Write the title of the page
 
-    FH.close()                            #Close the file
+            FH.close()                            #Close the file
 
 #Calculating the total time required to crawl, find and download all the links of 60,000 images
 print("Total time taken: " + str(time.time() - T0) + " Seconds")
@@ -141,30 +138,31 @@ print("Starting Download...")
 ## To save imges to the same directory
 # IN this saving process we are just skipping the URL if there is any error
 
-k = 0
 errorCount = 0
-while(k < len(items)):
-
+for item in items:
     try:
-        k += 1
-        REQ = urllib.request.Request(items[k], headers={"User-Agent": USER_AGENT})
-        RESPONSE = urlopen(REQ)
-        DATA = RESPONSE.read()
-        open(str(k+1) + ".jpg", 'wb').write(DATA)
-        RESPONSE.close()
+        outputPath = "output/" + hashlib.md5(item).hexdigest() + ".jpg"
 
-        print("completed ====> "+str(k))
+        if Path(outputPath).is_file:
+            print(outputPath + " is already downloaded. Skip.")
+        else:
+            REQ = urllib.request.Request(item, headers={"User-Agent": USER_AGENT})
+            RESPONSE = urlopen(REQ)
+            DATA = RESPONSE.read()
+            open(outputPath, 'wb').write(DATA)
+            RESPONSE.close()
 
+        print("completed ====> "+str(item))
 
     except IOError:   #If there is any IOError
         errorCount += 1
-        print("IOError on image "+str(k))
+        print("IOError on image "+str(item))
     except HTTPError as e:  #If there is any HTTPError
         errorCount += 1
-        print("HTTPError"+str(k))
+        print("HTTPError"+str(item))
     except URLError as e:
         errorCount += 1
-        print("URLError "+str(k))
+        print("URLError "+str(item))
 
 print("\n")
 print("All are downloaded")
